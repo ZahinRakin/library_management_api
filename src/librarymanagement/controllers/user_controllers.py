@@ -47,3 +47,13 @@ async def fetch_user_info(user_id):
     except Exception as e:
         print(f"something happened while viewing profile.\n{e}")
         raise HTTPException(status_code=400, detail=str(e))
+
+
+async def get_user(user_id):
+    return await User.get_all(user_id)
+
+
+async def get_total_user_count():
+    return await User.find({}).count()
+
+

@@ -89,3 +89,15 @@ async def search_books(search_key) -> List[Book]:
     except Exception as e:
         print(f"something happened while fetching the books.\n{e}")
         raise HTTPException(status_code=400, detail=str(e))
+
+
+async def get_book(book_id) -> Book:
+    return await Book.get(book_id)
+
+
+async def get_total_book_count():
+    return await Book.find({}).count()
+
+
+async def get_available_book_count():
+    return await Book.find({"available_copies": {"$gt": 0}}).count()

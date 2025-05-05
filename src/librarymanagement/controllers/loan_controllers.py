@@ -1,6 +1,6 @@
+from librarymanagement.controllers.book_controllers import get_book
+from librarymanagement.controllers.user_controllers import get_user
 from librarymanagement.models.loan_extension_models import LoanExtension
-from librarymanagement.models.user_models import User
-from librarymanagement.models.book_models import Book
 from librarymanagement.models.loan_models import Loan
 from librarymanagement.models.loan_schemas import (
     LoanRequestModel,
@@ -11,20 +11,19 @@ from librarymanagement.models.loan_schemas import (
     UserMainAttributes
 )
 
+
 from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException
-from typing import Optional, List
 from beanie.operators import Set
-from bson import ObjectId
 from beanie.operators import And
 
 
 async def issue_book(issue_data: LoanRequestModel):
-    user = await User.get(issue_data.user_id)
+    user = await get_user(issue_data.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
 
-    book = await Book.get(issue_data.book_id)
+    book = await get_book(issue_data.book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found.")
 
@@ -90,7 +89,7 @@ async def return_book(loan_id: str):
             detail="This book has already been returned"
         )
 
-    book = await Book.get(loan.book_id)
+    book = await get_book(loan.book_id)
     if not book:
         raise HTTPException(
             status_code=404,
@@ -117,7 +116,7 @@ async def return_book(loan_id: str):
         )
 
 async def view_user_loans(user_id):
-    user = await User.get(user_id)
+    user = await get_user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
 
@@ -125,7 +124,7 @@ async def view_user_loans(user_id):
     result = []
 
     for loan in loans:
-        book = await Book.get(loan.book_id)
+        book = await get_book(loan.book_id)
         lrm = LoanResponseModel(
             id = str(loan.id),
             book = BookMainAttributes(
@@ -158,8 +157,8 @@ async def fetch_overdue_loans():
             due_date_aware = loan.due_date.replace(tzinfo=timezone.utc) if loan.due_date else None
             days_overdue = (now - due_date_aware).days if due_date_aware else 0
 
-            user = await User.get(loan.user_id)
-            book = await Book.get(loan.book_id)
+            user = await get_user(loan.user_id)
+            book = await get_book(loan.book_id)
 
             results.append(
                 OverdueLoanResponseModel(
@@ -243,6 +242,53 @@ async def extend_loan(loan_id: str, extension_days: int):
     except Exception as e:
         print(f"Error extending loan: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error extending loan: {str(e)}")
-#---------------------------------------
+
+async def get_active_counts(limit: int):
+    return await Loan.aggregate([
+        {"$match": {"status": "ACTIVE"}},
+        {"$group": {
+            "_id": "$user_id",
+            "current_borrows": {"$sum": 1},
+            "latest_activity": {"$max": "$issue_date"}
+        }},
+        {"$sort": {"current_borrows": -1, "latest_activity": -1}},
+        {"$limit": limit}
+    ]).to_list()
+
+async def get_loan_per_book(limit):
+    pipeline = [
+        {"$group": {
+            "_id": "$book_id",
+            "borrow_count": {"$sum": 1}
+        }},
+        {"$sort": {"borrow_count": -1}},
+        {"$limit": limit}
+    ]
+    return await Loan.aggregate(pipeline).to_list()
+
+async def from_loan_calc_usr_total_borrows(user_id_str):
+    await Loan.find(Loan.user_id == user_id_str).count()
+
+async def get_overdue_loan_count():
+    return await Loan.find({
+        "status": "ACTIVE",
+        "due_date": {"$lt": datetime.now(timezone.utc)}
+    }).count()
+
+async def get_loans_today_count():
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    return await Loan.find({
+        "status": "ACTIVE",
+        "issue_date": {"$gte": today_start}
+    }).count()
+
+async def get_returns_today():
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    return await Loan.find({
+        "status": "RETURNED",
+        "return_date": {"$gte": today_start}
+    }).count()
 
 

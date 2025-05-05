@@ -1,37 +1,24 @@
-import asyncio
-import traceback
-
-from fastapi import HTTPException
-
-from librarymanagement.models.user_models import User
-from librarymanagement.models.book_models import Book
-from librarymanagement.models.loan_models import Loan
 from librarymanagement.models.overview_schemas import OverviewModel
 from librarymanagement.models.stat_schemas import PopularBookResponseModel, MostActiveUserResponseModel
+from ..controllers.loan_controllers import get_loan_per_book, get_active_counts, from_loan_calc_usr_total_borrows, \
+    get_overdue_loan_count, get_loans_today_count, get_returns_today
+from ..controllers.book_controllers import get_book, get_total_book_count, get_available_book_count
+from ..controllers.user_controllers import get_user, get_total_user_count
 
 from datetime import datetime, timezone
 from typing import List
 from beanie.operators import In
 from beanie import PydanticObjectId
+from fastapi import HTTPException
 
 
 async def fetch_popular_books(limit: int = 10) -> List[PopularBookResponseModel]:
     try:
-        # 1. Aggregation pipeline to count loans per book (Beanie style)
-        pipeline = [
-            {"$group": {
-                "_id": "$book_id",
-                "borrow_count": {"$sum": 1}
-            }},
-            {"$sort": {"borrow_count": -1}},
-            {"$limit": limit}
-        ]
-        loan_counts = await Loan.aggregate(pipeline).to_list()
-
+        # 1. Aggregation pipeline to count loans per book we can craete a method in the loan controlller named get loan per book
+        loan_counts = await get_loan_per_book(limit)
         # 2. Batch fetch books using Beanie's In operator
         book_ids = [PydanticObjectId(item["_id"]) for item in loan_counts]
-        books = await Book.find(In(Book.id, book_ids)).to_list()
-
+        books = [await get_book(id) for id in book_ids]
         # Create lookup dictionary (convert ID to string for consistency)
         book_map = {str(book.id): book for book in books}
 
@@ -53,16 +40,7 @@ async def fetch_popular_books(limit: int = 10) -> List[PopularBookResponseModel]
 
 async def fetch_active_users(limit: int = 10) -> List[MostActiveUserResponseModel]:
     try:
-        active_counts = await Loan.aggregate([
-            {"$match": {"status": "ACTIVE"}},
-            {"$group": {
-                "_id": "$user_id",
-                "current_borrows": {"$sum": 1},
-                "latest_activity": {"$max": "$issue_date"}
-            }},
-            {"$sort": {"current_borrows": -1, "latest_activity": -1}},
-            {"$limit": limit}
-        ]).to_list()
+        active_counts = await get_active_counts(limit)
 
         if not active_counts:
             return []
@@ -72,12 +50,12 @@ async def fetch_active_users(limit: int = 10) -> List[MostActiveUserResponseMode
         for item in active_counts:
             user_id_str = item["_id"]
             try:
-                user = await User.get(user_id_str)
+                user = await get_user(user_id_str)
             except Exception:
                 continue  # skip if conversion or fetch fails
 
             if user:
-                total_borrows = await Loan.find(Loan.user_id == user_id_str).count()
+                total_borrows = await from_loan_calc_usr_total_borrows(str(user.id))
                 result.append(MostActiveUserResponseModel(
                     user_id=user_id_str,
                     name=user.name,
@@ -90,30 +68,16 @@ async def fetch_active_users(limit: int = 10) -> List[MostActiveUserResponseMode
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 async def calculate_overview() -> OverviewModel:
-    now = datetime.now(timezone.utc)
+    total_books = await get_total_book_count()
+    total_users = await get_total_user_count()
+    books_available = await get_available_book_count()
 
-    # Use find().count() instead of count_documents()
-    total_books = await Book.find({}).count()
-    total_users = await User.find({}).count()
-    books_available = await Book.find({"available_copies": {"$gt": 0}}).count()
+    overdue_loans = await get_overdue_loan_count()
 
-    overdue_loans = await Loan.find({
-        "status": "ACTIVE",
-        "due_date": {"$lt": now}
-    }).count()
+    loans_today = await get_loans_today_count()
 
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    loans_today = await Loan.find({
-        "status": "ACTIVE",
-        "issue_date": {"$gte": today_start}
-    }).count()
-
-    returns_today = await Loan.find({
-        "status": "RETURNED",
-        "return_date": {"$gte": today_start}
-    }).count()
+    returns_today = await get_returns_today()
 
     return OverviewModel(
         total_books=total_books,

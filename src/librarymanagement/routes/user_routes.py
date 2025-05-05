@@ -15,6 +15,11 @@ router = APIRouter()
 async def register(user_data: User):
     return await register_user(user_data)
 
+@router.get("/{user_id}", response_model=User)
+async def get_user_info(user_id: str):
+    print("here inside fetch profile")      # debugging log
+    return await fetch_user_info(user_id)
+
 @router.put("/{user_id}")
 async def update_profile(user_id: str, updated_data: UpdateProfile):
     return await update_user(user_id, updated_data)
@@ -23,7 +28,3 @@ async def update_profile(user_id: str, updated_data: UpdateProfile):
 async def delete_user_from_db(user_id):
     return await delete_user(user_id)
 
-@router.get("/{user_id}", response_model=User)
-async def get_user_info(user_id: str):
-    print("here inside fetch profile")      # debugging log
-    return await fetch_user_info(user_id)

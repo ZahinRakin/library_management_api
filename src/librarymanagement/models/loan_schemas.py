@@ -57,5 +57,5 @@ class LoanResponseModel(BaseModel):
     book: Optional[BookMainAttributes]
     issue_date: datetime
     due_date: datetime
-    return_date: datetime
+    return_date: Optional[datetime] = None
     status: str

@@ -40,10 +40,10 @@ app.add_middleware(
     allow_headers = ["*"]
 )
 
-app.include_router(router=user_router, prefix="/api/users")
-app.include_router(router=book_router, prefix="/api/books")
-app.include_router(router=loan_router, prefix="/api")
-app.include_router(router=stat_router, prefix="/api/stats")
+app.include_router(router=user_router, prefix="/api/users", tags=["users"])
+app.include_router(router=book_router, prefix="/api/books", tags=["books"])
+app.include_router(router=loan_router, prefix="/api/loans", tags=["loans"])
+app.include_router(router=stat_router, prefix="/api/stats", tags=["stats"])
 
 
 def main():

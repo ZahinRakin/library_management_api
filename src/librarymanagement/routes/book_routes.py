@@ -18,6 +18,19 @@ router = APIRouter()
 async def add(book_data:Book):
     return await add_book(book_data)
 
+@router.get("/", response_model=List[Book])
+async def get_books(search: str = Query(...)):
+    return await search_books(search)
+
+
+@router.get("/{book_id}", response_model=Book)
+async def get_book_details(book_id):
+    return await fetch_book_details(book_id)
+
+@router.get("/{book_id}/available", response_model=BookAvailability)
+async def check(book_id: str):
+    return await check_book_availability(book_id)
+
 @router.put("/{book_id}")
 async def update(book_id: str, book_data: UpdateBook):
     return await update_book(book_id, book_data)
@@ -26,14 +39,6 @@ async def update(book_id: str, book_data: UpdateBook):
 async def delete(book_id:str):
     return await delete_book(book_id)
 
-@router.get("/", response_model=List[Book])
-async def get_books(search: str = Query(...)):
-    return await search_books(search)
 
-@router.get("/{book_id}", response_model=Book)
-async def get_book_details(book_id):
-    return await fetch_book_details(book_id)
-@router.get("/{book_id}/available", response_model=BookAvailability)
-async def check(book_id: str):
-    return await check_book_availability(book_id)
+
 
