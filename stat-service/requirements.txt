@@ -1,0 +1,9 @@
+uvicorn
+fastapi[standard]
+python-dotenv
+beanie
+pydantic[email]
+datetime
+motor
+httpx
+
