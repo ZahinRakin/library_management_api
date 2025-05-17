@@ -50,7 +50,7 @@ async def fetch_user_info(user_id):
 
 
 async def get_user(user_id):
-    return await User.get_all(user_id)
+    return await User.get(user_id)
 
 
 async def get_total_user_count():

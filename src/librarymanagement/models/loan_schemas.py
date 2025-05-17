@@ -10,7 +10,7 @@ from librarymanagement.models.loan_models import Loan
 class LoanRequestModel(BaseModel):
     user_id: str
     book_id: str
-    due_date: Optional[datetime]
+    due_date: Optional[datetime] = None
 
 class LoanReturnRequestModel(BaseModel):
     loan_id: str
