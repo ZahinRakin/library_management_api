@@ -1,6 +1,6 @@
 from app.models.loan_extension_models import LoanExtension
 from app.models.loan_models import Loan
-from app.utils.book import get_book
+from app.utils.book import get_book, save_book
 from app.utils.user import get_user
 from app.models.loan_schemas import (
     LoanRequestModel,
@@ -22,14 +22,16 @@ from beanie.operators import And
 
 async def issue_book(issue_data: LoanRequestModel):
     user = await get_user(issue_data.user_id)   
+    # print("user: ", user) # log
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
 
     book = await get_book(issue_data.book_id)    
+    # print("inside issue book: ", book)  # debugging log
     if not book:
         raise HTTPException(status_code=404, detail="Book not found.")
 
-    if book.available_copies < 1:
+    if int(book["available_copies"]) < 1:
         raise HTTPException(
             status_code=400,
             detail="No available copies of the book."
@@ -52,16 +54,16 @@ async def issue_book(issue_data: LoanRequestModel):
 
     try:
         loan = Loan(
-            user_id=str(user.id),
-            book_id=str(book.id),
+            user_id=str(user["_id"]),
+            book_id=str(book["_id"]),
             issue_date=datetime.now(timezone.utc),
             due_date=due_date,
             status="ACTIVE"
         )
         await loan.insert()
 
-        book.available_copies -= 1
-        await book.save()
+        book["available_copies"] -= 1
+        await save_book(book["_id"], book)     # save book
 
         del loan.extension_count
         del loan.return_date
@@ -104,8 +106,9 @@ async def return_book(loan_id: str):
             "return_date": datetime.now(timezone.utc)
         }))
 
-        book.available_copies += 1
-        await book.save()
+        book["available_copies"] += 1
+        # await book.save()              # change
+        await save_book(book["_id"], book)
 
         del loan.extension_count
 
@@ -130,9 +133,9 @@ async def view_user_loans(user_id):
         lrm = LoanResponseModel(
             id = str(loan.id),
             book = BookMainAttributes(
-                id = str(book.id),
-                title = book.title,
-                author = book.author
+                id = str(book["_id"]),
+                title = book["title"],
+                author = book["author"]
             ),
             issue_date = loan.issue_date,
             due_date = loan.due_date,
@@ -166,14 +169,14 @@ async def fetch_overdue_loans():
                 OverdueLoanResponseModel(
                     id=str(loan.id),
                     user=UserMainAttributes(
-                        id=str(user.id),
-                        name=user.name,
-                        email=user.email
+                        id=str(user["_id"]),
+                        name=user["name"],
+                        email=user["email"]
                     ),
                     book=BookMainAttributes(
-                        id=str(book.id),
-                        title=book.title,
-                        author=book.author
+                        id=str(book["_id"]),
+                        title=book["title"],
+                        author=book["author"]
                     ),
                     issue_date=loan.issue_date,
                     due_date=loan.due_date,
@@ -203,18 +206,14 @@ async def extend_loan(loan_id: str, extension_days: int):
         if loan.status != "ACTIVE":
             raise HTTPException(status_code=400, detail="Only ACTIVE loans can be extended.")
 
-        # Ensure due_date is timezone-aware (UTC)
         original_due_date = loan.due_date.replace(tzinfo=timezone.utc) if loan.due_date else None
         if not original_due_date:
             raise HTTPException(status_code=400, detail="Loan due date is missing.")
 
-        # Calculate extended due date
         extended_due_date = original_due_date + timedelta(days=extension_days)
 
-        # Update loan
         loan.extension_count += 1
 
-        # Create extension record
         extension = LoanExtension(
             loan_id=str(loan.id),
             extension_days=extension_days,
@@ -224,7 +223,6 @@ async def extend_loan(loan_id: str, extension_days: int):
         )
         await extension.insert()
 
-        # Update loan's due date
         loan.due_date = extended_due_date
         await loan.save()
 

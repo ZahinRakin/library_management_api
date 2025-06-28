@@ -11,7 +11,7 @@ from ..utils.loan import (
     get_loan_per_book, 
     get_active_counts, 
     from_loan_calc_usr_total_borrows, 
-    get_overdue_loan_count,
+    get_overdue_loan_count, # prb
     get_loans_today_count,
     get_returns_today
 )
@@ -20,24 +20,20 @@ from ..utils.user import get_user, get_total_user_count
 
 async def fetch_popular_books(limit: int = 10) -> List[PopularBookResponseModel]:
     try:
-        # 1. Aggregation pipeline to count loans per book we can craete a method in the loan controlller named get loan per book
         loan_counts = await get_loan_per_book(limit)
-        # 2. Batch fetch books using Beanie's In operator
         book_ids = [PydanticObjectId(item["_id"]) for item in loan_counts]
         books = [await get_book(id) for id in book_ids]
-        # Create lookup dictionary (convert ID to string for consistency)
-        book_map = {str(book.id): book for book in books}
+        book_map = {str(book["_id"]): book for book in books}
 
-        # 3. Build response maintaining sort order
         return [
             PopularBookResponseModel(
                 book_id=item["_id"],
-                title=book_map[item["_id"]].title,
-                author=book_map[item["_id"]].author,
+                title=book_map[item["_id"]]["title"],
+                author=book_map[item["_id"]]["author"],
                 borrow_count=item["borrow_count"]
             )
             for item in loan_counts
-            if item["_id"] in book_map  # Handle potential data inconsistencies
+            if item["_id"] in book_map
         ]
 
     except Exception as e:
@@ -58,13 +54,13 @@ async def fetch_active_users(limit: int = 10) -> List[MostActiveUserResponseMode
             try:
                 user = await get_user(user_id_str)
             except Exception:
-                continue  # skip if conversion or fetch fails
+                continue 
 
             if user:
-                total_borrows = await from_loan_calc_usr_total_borrows(str(user.id))
+                total_borrows = await from_loan_calc_usr_total_borrows(str(user["_id"]))
                 result.append(MostActiveUserResponseModel(
                     user_id=user_id_str,
-                    name=user.name,
+                    name=user["name"],
                     books_borrowed=total_borrows,
                     current_borrows=item["current_borrows"]
                 ))
