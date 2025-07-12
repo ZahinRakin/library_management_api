@@ -15,3 +15,9 @@ async def save_book(book_id, book):
     response = requests.put(url, json=book)
     response.raise_for_status()  # Optional: raises error if response is not 2xx
     return response.json()
+
+#  File "/home/zahin-abdullah-rakin/Documents/6th semester/library_management_api/loan-service/app/services/loan.py", line 3, in <module>
+#    from app.utils.book import get_book, save_book
+#  File "/home/zahin-abdullah-rakin/Documents/6th semester/library_management_api/loan-service/app/utils/book.py", line 1, in <module>
+#    import requests
+#ModuleNotFoundError: No module named 'requests'

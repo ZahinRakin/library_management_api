@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  book-service:
+    build: ./book-service
+    ports:
+      - "8000:8000"
+    networks: [ backend ]
+
+  loan-service:
+    build: ./loan-service
+    ports:
+      - "8001:8001"
+    networks: [ backend ]
+
+  stats-service:
+    build: ./stats-service
+    ports:
+      - "8002:8002"
+    networks: [ backend ]
+
+  user-service:
+    build: ./user-service
+    ports:
+      - "8003:8003"
+    networks: [ backend ]
+
+  nginx:
+    build: ./nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - book-service
+      - loan-service
+      - stats-service
+      - user-service
+    networks: [ backend ]
+
+networks:
+  backend:

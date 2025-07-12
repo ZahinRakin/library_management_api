@@ -4,22 +4,36 @@ import os
 
 from app.models.user_models import User
 
-
-client = None  # Declare client outside to use it for both connect and disconnect
+client: AsyncIOMotorClient | None = None  # Global client reference
 
 async def connect_db():
     global client
     try:
-        print("connecting to database")  # debugging log
-        client = AsyncIOMotorClient(os.getenv("MONGODB_URI"))
-        db = client[os.getenv("DB_NAME")]
-        await init_beanie(db, document_models=[User ])
-        print("database connected")     # debugging log
+        print("[DB] Connecting to MongoDB...")
+
+        mongo_uri = os.getenv("MONGODB_URI")
+        db_name = os.getenv("DB_NAME")
+
+        if not mongo_uri or not db_name:
+            raise ValueError("Environment variables MONGODB_URI and DB_NAME must be set.")
+
+        client = AsyncIOMotorClient(mongo_uri)
+
+        # Check MongoDB connection
+        await client.admin.command("ping")
+        print("[DB] Pinged MongoDB successfully.")
+
+        db = client[db_name]
+
+        # Initialize Beanie ODM
+        await init_beanie(database=db, document_models=[User])
+        print("[DB] Beanie initialized with User model.")
+
     except Exception as e:
-        print(f"something happened while connecting to the database. \n{e}")
+        print(f"[DB] Failed to connect to MongoDB: {e}")
 
 async def disconnect_db():
     global client
     if client:
-        client.close()  # Close the connection
-        print("Disconnected from the database.")
+        client.close()
+        print("[DB] Disconnected from MongoDB.")

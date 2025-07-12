@@ -1,0 +1,34 @@
+book-service
+    app
+        api
+            book_routes.py
+        db
+            db.py //it connects to the db
+        models
+            book_models.py
+            book_schemas.py
+        services
+            books.py
+    venv
+loan-service
+    app
+        api
+            loans_routes.py
+        db
+        models
+        services
+    venv
+stat-service
+    app
+        api
+        db
+        models
+        services
+    venv
+user-service
+    app
+        api
+        db
+        models
+        services
+    venv
